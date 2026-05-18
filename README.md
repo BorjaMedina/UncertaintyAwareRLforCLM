@@ -3,8 +3,12 @@
 This repository contains the code and experiments for my master's thesis on uncertainty-aware reinforcement learning for de novo molecular design.
 Everything corresponding to the paper is inside of `UncertaintyAwareRLforCLM`
 
+![RL Schematic](UncertaintyAwareRLforCLM/03_results/rlSchematic.png)
+
 
 DISCLAIMER: If you want to check the `README.md` of REINVENT4 check `REINVENT4_README.md` 
+
+
 
 ## REINVENT4 Introduction and Credit
 
