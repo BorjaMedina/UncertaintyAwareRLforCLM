@@ -1,187 +1,204 @@
-REINVENT 4
-==========
+# Uncertainty-Aware reinforcement learning for chemical language models
+
+This repository contains the code and experiments for my master's thesis on uncertainty-aware reinforcement learning for de novo molecular design.
+Everything corresponding to the paper is inside of `UncertaintyAwareRLforCLM`
 
 
-Description
------------
+DISCLAIMER: If you want to check the `README.md` of REINVENT4 check `REINVENT4_README.md` 
 
-REINVENT is a molecular design tool for de novo design, scaffold hopping,
-R-group replacement, linker design, molecule optimization, and other small
-molecule design tasks.  REINVENT uses a Reinforcement Learning
-(RL) algorithm to generate optimized molecules compliant with a user defined
-property profile defined as a multi-component score.  Transfer Learning (TL)
-can be used to create or pre-train a model that generates molecules closer
-to a set of input molecules. 
+## REINVENT4 Introduction and Credit
 
-A paper describing the software has been published as Open Access in the
-Journal of Cheminformatics:
-[Reinvent 4: Modern AI–driven generative molecule design](https://link.springer.com/article/10.1186/s13321-024-00812-5?utm_source=rct_congratemailt&utm_medium=email&utm_campaign=oa_20240221&utm_content=10.1186/s13321-024-00812-5).
-See AUTHORS.md for references to previous papers.
+REINVENT4 is an open-source framework for molecular generation and multi-objective optimization. It uses a generative model (policy) to propose molecules and optimizes it with reinforcement learning based on scoring functions.
+
+In this thesis, REINVENT4 is the baseline framework and has been extended with new uncertainty-aware functionalities. These additions are implemented on top of the REINVENT4 workflow while preserving its core training and optimization process.
+
+This work relies on the original REINVENT4 implementation and the contributions of its authors and maintainers. Please cite the official REINVENT4 publication and repository when using or referencing this project.
 
 
-Requirements
-------------
+## Repository Structure
 
-REINVENT is being developed on Linux and supports both GPU and CPU.  The Linux
-version is fully validated.  REINVENT on Windows supports GPU and CPU while
-MacOSX supports CPU only, but both platforms are only partially tested and
-therefore support is limited.
+- `00_data/`: dataset preparation and cleaning.
+- `01_AD/`: applicability domain analysis.
+- `01_cp/`: conformal prediction and random forest uncertainty modeling.
+- `01_chemprop/`: Chemprop MVE training scripts.
+- `02_RL/`: REINVENT4 reinforcement learning experiments and configs.
+- `03_results/`: generated figures and summary plots.
+- `presentationPlots.ipynb`: notebook used for thesis/presentation plots.
 
-The code is written in Python 3 (>= 3.10).  The list of
-dependencies can be found in the repository (see also Installation below).
+## Environment Setup
 
-A GPU is not strictly necessary but strongly recommended for performance
-reasons especially for transfer learning and model training.  For Reinforcement
-learning (RL) a GPU is less important becayse most scoring components run on
-the CPU.
-
-Note that if no GPU is installed in your computer the code will run on the
-CPU automatically.  REINVENT [supports](https://pytorch.org/get-started/locally/), as of this writing, NVIDIA GPUs, some AMD GPUs and Intel ARC.
-For most design tasks a memory of about 8 GiB for both CPU main memory and
-GPU memory is sufficient.
+Create and activate the main conda environment:
 
 
-Installation
-------------
-
-**Using conda**
-
-1. Clone this Git repository. Add `--depth 1` for only the newest version as the repository has grown quite large over time.
-    ```shell
-    git clone git@github.com:MolecularAI/REINVENT4.git  # --depth 1
-    ```
-1. Create a Python environment and install a compatible version of Python, for example with [Conda](https://conda.io/projects/conda/en/latest/index.html) or other virtual environments.
-    ```shell
-    conda create --name reinvent4 python=3.10
-    conda activate reinvent4
-    ```
-1. Change directory to the repository to install all dependencies.  You will need to set the right processor type, see [PyTorch versions](https://pytorch.org/get-started/locally/). Linux supports CUDA (e.g. "cu126"), AMD ROCm (e.g. "rocm6.4"), Intel XPU ("xpu") and CPU. Windows supports CUDA, XPU and CPU.  MacOSX only supports CPU (use "mac" as processor type!). Optionally, you can select dependencies "openeye" (for ROCS; you need to obtain your own license), "isim" for similarity tracking in TensorBoard or "none" to skip all.  The default is installation of "all" dependencies.  See the help text from the install script for details.
-    ```shell
-    python install.py --help
-    python install.py cu126  # or rocm6.4, xpu, cpu, mac, etc.
-    ```
-1. Test the tool. The installer has added a script `reinvent` to your PATH.
-    ```shell
-    reinvent --help
-    ```
-
-**Using uv (experimental)**
-
-[uv](https://docs.astral.sh/uv/) is a fast Python package manager that handles virtual environments and dependencies in one step.
-
-1. Clone this Git repository. Add `--depth 1` for only the newest version as the repository has grown quite large over time.
-    ```shell
-    git clone git@github.com:MolecularAI/REINVENT4.git  # --depth 1
-    ```
-1. Change directory to the repository and run `uv sync`.  The PyTorch index for CUDA 12.8 is pre-configured in `pyproject.toml`.
-    ```shell
-    cd REINVENT4
-    uv sync                   # core dependencies
-    uv sync --extra isim      # + iSIM similarity tracking in TensorBoard
-    uv sync --extra all       # + OpenEye ROCS (requires a license)
-    ```
-1. Test the tool.
-    ```shell
-    uv run reinvent --help
-    ```
-
-Prior models
-------------
-
-All public prior models can be found on [Zenodo](https://doi.org/10.5281/zenodo.15641296).
-
-
-Basic Usage
------------
-
-REINVENT is a command line tool and works principally as follows
-```shell
-reinvent -l sampling.log sampling.toml
+```bash
+conda env create -f chemprop.yaml
 ```
-
-This writes logging information to the file `sampling.log`.  If you wish to write
-this to the screen, leave out the `-l sampling.log` part. `sampling.toml` is the
-configuration file.  The main format is [TOML](https://toml.io/en/) as it tends to be more user friendly.  JSON and YAML are supported too.
-
-Sample TOML configuration files for all run modes are located in `configs/` in
-the repository.  File paths in these files need to be adjusted to your local
-installation.  You will need to choose a model and the appropriate run mode
-depending on the research problem you are trying to address.  There is
-additional documentation in `configs/` in several `*.md` files with
-instructions on how to configure the TOML file.  Internal priors can be
-referenced with a dot notation (see `reinvent/prior_registry.py`).
-
-
-Tutorials / `Jupyter` notebooks
--------------------------------
-
-Basic instructions can be found in the comments in the config examples in
-`configs/`.
-
-Notebooks are provided in the `notebooks/` directory and contributed notebooks
-and tutorials in `contrib/`.  Please note that we provide the notebooks in
-jupytext "light script" format.  To work with the light scripts you will need
-to install jupytext.  A few other packages will come in handy too.
-
-```shell
-pip install jupytext mols2grid seaborn
-```
-
-The Python files in `notebooks/` can then be converted to a notebook e.g.
-
-```shell
-jupytext -o Reinvent_demo.ipynb Reinvent_demo.py
+```bash
+conda env create -f reinvent4.yaml
+conda activate reinvent4
 ```
 
 
-Scoring Plugins
----------------
+## How to Reproduce the Workflow
 
-The scoring subsystem uses a simple plugin mechanism (Python
-[native namespace packages](https://packaging.python.org/en/latest/guides/packaging-namespace-packages/#native-namespace-packages)).  If you
-wish to write your own plugin, follow the instructions below.
-There is no need to touch any of the REINVENT code. The public
-repository contains a [contrib](https://github.com/MolecularAI/REINVENT4/tree/main/contrib/reinvent_plugins/components) directory with some useful examples.
+Run the pipeline in this order.
 
-1. Create `/top/dir/somewhere/reinvent\_plugins/components` where `/top/dir/somewhere` is a convenient location for you.
-1. Do **not** place a `__init__.py` in either `reinvent_plugins` or `components` as this would break the mechanism.  It is fine to create normal packages within `components` as long as you import those correctly.
-1. Place a file whose name starts with `comp_*` into `reinvent_plugins/components` or subdirectories.   Files with different names will be ignored i.e. not imported. The directory will be searched recursively so structure your code as needed but directory/package names must be unique.
-1. Tag the scoring component class(es) in that file with the @add\_tag decorator.  More than one component class can be added to the same *comp\_* file. See existing code.
-1. Tag at most one dataclass for parameters in the same file, see existing code.  This is optional.
-1. Set or add `/top/dir/somewhere` to the `PYTHONPATH` environment variable or use any other mechanism to extend `sys.path`.
-1. The scoring component should now automatically be picked up by REINVENT.
+### 1) Data Preparation
 
-Ensure that the component can be important. The log file will write out an error if not.  Check directly if import is possible:
+Start from:
 
-```Python
-from reinvent_plugins.components import comp_myscorer
+- `00_data/cleaningData.ipynb`
+
+The datasets were downloaded form ChEMBL Version 34.
+
+This step produces curated datasets under `00_data/egfr/` and `00_data/drd2/` used by downstream models.
+
+Additionlly we also create the conda environemnts needed.
+
+DISCLAIMER: to run reinvent you will need to install reinvent inside the reinvent4 conda env following the instructions present in `REINVENT4_README.md`
+
+### 2) Train Uncertainty Models
+
+#### 2.1 Chemprop MVE models
+
+GPU cluster (SLURM) examples:
+
+```bash
+sbatch 01_chemprop/runChempropSuperSmall.sh
+sbatch 01_chemprop/runChempropFull.sh
 ```
 
+These scripts train MVE Chemprop regressors and save artifacts to the paths defined inside each script.
 
-Unit and Integration Tests 
---------------------------
+#### 2.2 Conformal prediction (RF + split conformal)
 
-This is primarily for developers and admins/users who wish to ensure that the
-installation works.  The information here is not relevant to the practical use
-of REINVENT.  Please refer to _Basic Usage_ for instructions on how to use the 
-`reinvent` command.
+Script:
 
-The REINVENT project uses the `pytest` framework for its tests.  Before you run
-them you first have to create a configuration file for the tests.
+- `01_cp/conformerPredictionModel.ipynb`
 
-In the project directory, create a `config.json` file in the `configs/` directory.
-You can use the example config `example.config.json` as a base.  Make sure that
-you set `MAIN_TEST_PATH` to a non-existent directory.  That is where temporary
-files will be written during the tests.  If it is set to an existing directory,
-that directory will be removed once the tests have finished.
+Inside this notebook we create the conformal prediction model
 
-Some tests require a proprietary OpenEye license.  You have to set up a few
-things to make the tests read your license.  The simple way is to just set the
-`OE_LICENSE` environment variable to the path of the file containing the
-license.  
 
-Once you have a configuration and your license can be read, you can run the tests.
+### 3) Run REINVENT4 RL Experiments
 
+
+- `02_RL/`
+
+This folder contains all required configuration files, organized by experiment type, including Model System experiments, Chemprop experiments (point-estimation and averaged variants), and conformal prediction experiments.
+
+For the Model System, configurations are provided for both the Unique Noisy Function and Multiple Noisy Functions settings, as well as the low-similarity and mid-similarity scenarios used in the master's thesis.
+
+Main launcher scripts:
+
+- `02_RL/runRL.sh` (GPU partition)
+- `02_RL/runRLcpu.sh` (CPU partition)
+- `02_RL/runMultiple.sh` (batch submit for a config folder)
+
+Submit one RL run:
+
+```bash
+sbatch 02_RL/runRL.sh 02_RL/finalRL/multipleNoise_low/rl_doubleUnc_w0_SF_w1_N5.json
 ```
-$ pytest tests --json /path/to/config.json --device cuda
+
+Submit multiple runs:
+
+```bash
+bash 02_RL/runMultiple.sh
 ```
+
+Run locally without SLURM:
+
+```bash
+conda activate reinvent4
+reinvent --log-level debug 02_RL/finalRL/multipleNoise_low/rl_doubleUnc_w0_SF_w1_N5.json
+```
+
+### 4) Collect and Plot Results
+
+Main output locations:
+
+- RL logs: `02_RL/00_reinventLogs/`
+- RL experiment folders: `02_RL/finalRL/`
+- figures used in the thesis: `03_results/`
+
+For final figure generation and presentation plots, use:
+
+- `presentationPlots.ipynb`
+
+## Quick Reproduction Checklist
+
+1. Create conda environment from `reinvent4.yaml`.
+2. Prepare/clean datasets in `00_data/cleaningData.ipynb`.
+3. Train Chemprop and/or conformal uncertainty models.
+4. Select RL JSON configs in `02_RL/finalRL/.../csv/`.
+5. Launch RL with `sbatch 02_RL/runRL.sh <config.json>`.
+6. Aggregate and visualize results from `03_results/` and `presentationPlots.ipynb`.
+
+## Thesis Context
+
+The thesis studies how predictive uncertainty can be integrated into molecular RL in two ways:
+
+1. As an explicit optimization objective in the scoring function.
+2. As a modulation signal for policy updates.
+
+Experiments include synthetic and real-world uncertainty settings (AD-like scenarios, Chemprop MVE, and conformal prediction), implemented in the REINVENT4 optimization pipeline.
+
+
+## REINVENT4
+### 1) Main changes in REINVENT4
+
+In this project, I implemented new uncertainty-aware scoring components in REINVENT4.
+
+Main plugin folder:
+
+`reinvent_plugins/components/model_scoring_components`
+
+All scripts in this folder are thesis-specific additions used to incorporate uncertainty into scoring.
+
+#### 1.1 Core uncertainty components
+
+- `comp_model_logp.py` (`NoisyLogP`): computes LogP and injects distance-dependent stochastic noise. The uncertainty scale increases with distance to training data.
+- `comp_model_BertzCT.py` (`NoisyBertz`): same idea as `NoisyLogP`, but applied to BertzCT complexity.
+- `comp_distances.py` (`UNCdistances`): computes distance-to-training (k-NN based) and returns a distance-derived weight to penalize out-of-domain molecules.
+
+These components support tanimoto- and PCA-based distance variants through the shared helper functions in `compute_sims.py`.
+
+#### 1.2 Chemprop uncertainty integration
+
+- `comp_chemprop2.py` (`chemprop2`): Chemprop-based scoring component with MVE uncertainty estimation and calibration support.
+- `chemprop2_extProccess.py`: external prediction script that outputs Chemprop predictions + calibrated uncertainties as JSON.
+- `unc_chemprop2_extProccess.py`: external Chemprop script variant used for uncertainty-focused outputs.
+- `chemprop2_extProccessG.py`: generalized external Chemprop inference script that loads checkpoints from a model folder and returns calibrated prediction/uncertainty JSON.
+- `unc_chemprop2_extProccessG.py`: generalized uncertainty-focused variant that transforms uncertainty into a distance-like score.
+
+#### 1.3 Classification conformal prediction components
+
+- `comp_class_CP.py` (`classificationCP`): returns the active-class conformal p-value as a score.
+- `comp_unc_class_CP.py` (`uncclassificationCP`): returns uncertainty-oriented weights from conformal prediction set confidence.
+
+
+These components load a pre-trained conformal model artifact (`cloudpickle`) and compute conformal outputs from SMILES fingerprints.
+
+#### 1.4 Shared utilities and examples
+
+- `compute_sims.py`: shared similarity/distance utilities (Tanimoto, cosine, Euclidean in PCA space, optional distance transformation).
+
+
+#### 1.5 Small modifcations of the whole REINVENT4 repo
+- Adding the Average option - probabilistic scoring functions -  `reinvent/runmodes/RL/learning.py` line 136 and everything around average
+- Adding the Loss Modulation inside REINVENT4:
+    - `reinvent/runmodes/RL/reward.py`: LM (called reward in the config file)
+    - `reinvent/runmodes/RL/reinvent`: weight retrieving and merging of the different scoring components
+    - `reinvent/runmodes/RL/run_staged_learning.py`: sampling at the beginnign when necessary associated with each scoring component
+    - `reinvent/runmodes/RL/learning.py`: minor modifications
+
+
+
+#### 1.6 Notes
+
+- The components above were used in the uncertainty experiments described in this thesis (model system, Chemprop, and conformal settings).
+- Additional modifications were also made in other REINVENT4 files outside this folder to make the uncertainty work.
+
+
+
+

@@ -30,6 +30,7 @@ from reinvent.runmodes.RL.data_classes import ModelState
 from reinvent.models.model_factory.sample_batch import SmilesState
 from reinvent.models.model_factory.model_adapter import SampledSequencesDTO
 from reinvent.utils import get_reporter
+from reinvent_plugins.normalizers.rdkit_smiles import normalize
 
 if TYPE_CHECKING:
     from reinvent.runmodes.samplers import Sampler
@@ -63,9 +64,10 @@ class Learning(ABC):
         tb_logdir: str = None,
         tb_isim: bool = False,
         intrinsic_penalty: IntrinsicPenalty | None = None,
+        average: bool = False,
     ):
         """Setup of the common framework"""
-
+        self.average = average
         self.max_steps = max_steps
         self.stage_no = stage_no
         self.prior = prior
@@ -137,8 +139,14 @@ class Learning(ABC):
             self.duplicate_mask = np.where(
                 self.sampled.states == SmilesState.DUPLICATE, False, True
             )
-
-            results = self.score()
+            results=[]
+            if self.average:
+                all_results = [self.score() for _ in range(200)]
+                mean_scores = np.mean([r.total_scores for r in all_results], axis=0)
+                results = all_results[0]
+                results.total_scores = mean_scores
+            else:
+                results=self.score()
 
             if self._state.diversity_filter:
                 df_mask = np.where(self.invalid_mask, True, False)

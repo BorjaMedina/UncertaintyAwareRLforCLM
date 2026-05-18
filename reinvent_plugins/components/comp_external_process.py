@@ -15,7 +15,8 @@ from typing import List
 import logging
 import numpy as np
 from pydantic.dataclasses import dataclass
-
+import tempfile
+import torch
 from .component_results import ComponentResults
 from .run_program import run_command
 from .add_tag import add_tag
@@ -39,7 +40,7 @@ class Parameters:
     executable: List[str]
     args: List[str]
     property: List[str]
-
+    uncertainty_type: List[str] = None
 
 @add_tag("__component")
 class ExternalProcess:
@@ -75,6 +76,7 @@ class ExternalProcess:
 
         self.executable = params.executable[0]
         self.args = params.args[0]
+        self.uncertainty_type= params.uncertainty_type[0] if params.uncertainty_type else None
 
         # Ensure only one executable is used for all endpoints
         for exe, arg in zip(params.executable, params.args):
@@ -93,10 +95,33 @@ class ExternalProcess:
         _executable = os.path.abspath(self.executable)
         _args = shlex.split(self.args)
         smiles_input = "\n".join(smilies)
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".smi",
+            delete=False
+        ) as f:
+            f.write(smiles_input)
+            input_path = f.name
 
-        result = run_command([_executable] + _args, input=smiles_input)
+
+        # Free GPU memory before launching external process
+        if torch.cuda.is_available() and torch.cuda.is_initialized():
+            torch.cuda.empty_cache()
+            try:
+                torch.cuda.synchronize()
+            except RuntimeError:
+                pass  # GPU not available or context issue, continue anyway
+
+        env = os.environ.copy()
+        env['CUDA_VISIBLE_DEVICES'] = env.get('CUDA_VISIBLE_DEVICES', '0')
+        
+        #np.savetxt("/home/kcgd777/temp_input.txt", smilies, fmt="%s")
+        result = run_command([_executable] + _args+[input_path])
         data = json.loads(result.stdout)
-
+        logger.debug(result)
+        logger.debug(data)
+        #with open("/home/kcgd777/temp_results.json", mode="r") as json_file:
+            #data = json.load(json_file)
         if "payload" not in data:
             raise ValueError(
                 f"{__name__}: Stdout from {self.executable} does not contain 'payload': {result.stdout}"
@@ -122,4 +147,5 @@ class ExternalProcess:
             f"extracted properties: {self.properties}, metadata: {metadata}"
         )
 
-        return ComponentResults(scores, metadata=metadata)
+        os.remove(input_path)
+        return ComponentResults(scores, metadata=metadata, uncertainty_type=self.uncertainty_type)

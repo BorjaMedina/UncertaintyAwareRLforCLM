@@ -14,7 +14,7 @@ class SmilesResult:
 
     score: tuple  # multiple scores per component, and can be numbers or strings (as in MMP)
     score_property: Optional[List[Dict]] = None
-    uncertainities: Optional[float] = None
+    uncertainties: Optional[float] = None
     metadata: Optional[Dict] = None
     failures_properties: Optional[Dict] = None
 
@@ -68,6 +68,7 @@ class SmilesAssociatedComponentResults:
     def _score_lists_to_dict(
         smiles: List[str],
         scores: List[List[float | str]],
+        uncertainty: Optional[List[List[float | str]]]= None,
         metadata: Optional[Dict[str, List[float | str]]] = None,
     ) -> dict[str, SmilesResult]:
         """Utility method for converting from scores in the form of [[score0_mol0,score0_mol1,...],
@@ -90,10 +91,16 @@ class SmilesAssociatedComponentResults:
         else:
             # Metadata is optional so we need an empty placeholder
             values_to_upack.append([dict()] * len(smiles))
-
+    
+            
+        if uncertainty is not None:
+            values_to_upack.append(uncertainty)
+        else:
+            values_to_upack.append([None]*len(smiles))
+            
         return {
-            smiles: SmilesResult(score=score, metadata=metadata)
-            for smiles, score, metadata in zip(*values_to_upack)
+            smiles: SmilesResult(score=score,  uncertainties=uncertainties, metadata=metadata)
+            for smiles, score, metadata, uncertainties in zip(*values_to_upack)
         }
 
     def get_metadata_names(self):
@@ -114,7 +121,7 @@ class SmilesAssociatedComponentResults:
         """Constructor from either ComponentResults and smiles,  or setting th data directly"""
         if data is None:
             self.data = SmilesAssociatedComponentResults._score_lists_to_dict(
-                smiles, component_results.scores, component_results.metadata
+                smiles, component_results.scores, component_results.uncertainty, component_results.metadata
             )
         else:
             self.data = data

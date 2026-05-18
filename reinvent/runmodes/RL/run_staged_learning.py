@@ -1,7 +1,9 @@
 """Multi-stage learning with RL"""
 
 from __future__ import annotations
+import os
 import logging
+from typing import List, TYPE_CHECKING
 
 import torch
 
@@ -147,7 +149,32 @@ def run_staged_learning(
         for run, package in enumerate(packages):
             stage_no = run + 1
             csv_filename = f"{summary_csv_prefix}_{stage_no}.csv"
+            n = 1
+            
 
+            # Iterate over the scorers in the ComponentType object
+            for scorer in package.scoring_function.components.scorers: 
+                rewards=["uncdistances", "noisylogp", "noisybertz"]
+                if scorer.component_type.lower() in rewards: 
+                    newSamples = []
+
+                    while len(newSamples) < 500:
+                        samples = list(sampler.sample(1000).items2)
+                        newSamples.extend(samples)
+
+                    scoring_function=scorer.params[1]
+                    scoring_function.updateDist(newSamples)
+
+                params = list(scorer.params)
+                scorer.params = tuple(params) 
+            
+            filename=csv_filename
+            while os.path.exists(filename):
+                name, ext = os.path.splitext(csv_filename)
+                filename = f"{name}_n{n}{ext}" 
+                n += 1
+            csv_filename=filename    
+                
             setup_logger(
                 name="csv",
                 filename=csv_filename,
@@ -156,7 +183,7 @@ def run_staged_learning(
                 level="INFO",
             )
 
-            logdir = f"{tb_logdir}_{run}" if tb_logdir else None
+            logdir = f"{tb_logdir}_{run}_n{n}" if tb_logdir else None
 
             logger.info(f"Writing tabular data for stage to {csv_filename}")
             logger.info(f"Starting stage {stage_no} <<<")
@@ -167,6 +194,7 @@ def run_staged_learning(
             else:
                 state = ModelState(agent, package.diversity_filter)
                 logger.debug(f"Using stage DF")
+            
 
             optimize = model_learning(
                 max_steps=package.max_steps,
@@ -184,6 +212,7 @@ def run_staged_learning(
                 tb_logdir=logdir,
                 tb_isim=parameters.tb_isim,
                 intrinsic_penalty=intrinsic_penalty,
+                average=parameters.average,
             )
 
             if hasattr(torch, device.type) and device.type != "cpu":

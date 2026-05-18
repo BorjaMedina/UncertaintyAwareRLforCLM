@@ -14,7 +14,7 @@ __all__ = [
 ]
 
 import logging
-from typing import Callable, Optional, TYPE_CHECKING
+from typing import Callable, List, Tuple, Optional, TYPE_CHECKING
 import warnings
 
 import numpy as np
@@ -184,6 +184,7 @@ class RLReward:
         mask_idx: np.ndarray,
         inception: Optional[Inception],
         agent: Optional[ModelAdapter],
+        distances: Optional[List[float]] = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Entry point to run the learning strategy.
 
@@ -198,13 +199,19 @@ class RLReward:
         """
 
         scores = torch.from_numpy(scores).to(prior_nlls)
-
+        distances=torch.from_numpy(distances).to(prior_nlls)
+        
         # FIXME: move NaN filtering before first use of scores in learning
         # FIXME: reconsider NaN/failure handling
         nan_idx = torch.isnan(scores)
         scores_nonnan = scores[~nan_idx]
         agent_lls = -agent_nlls[~nan_idx]  # negated because we need to minimize
         prior_lls = -prior_nlls[~nan_idx]
+        
+        dist = distances[~nan_idx]
+        eps = torch.finfo(dist.dtype).eps
+        weights = dist.clamp_min(eps)
+        #weights = weights / weights.sum().clamp_min(eps)
 
         loss, augmented_lls = self._strategy(
             agent_lls,
@@ -235,7 +242,22 @@ class RLReward:
 
             loss = torch.cat((loss, inception_loss), 0)
 
+        # weights only covers the original batch; pad with ones for inception samples - this probably needs to be rethought and fixed
+            n_inception = len(loss) - len(weights)
+            weights = torch.cat((weights, torch.ones(n_inception, dtype=weights.dtype, device=weights.device)), 0)
+
+        orLoss = loss.sum()
+        loss = loss * weights
+        logger.debug(
+            f"Original loss: {orLoss.item()}, Weighted loss: {loss.sum().item()}, Weights: {weights.sum().item()}"
+        )
+
         loss = loss.mean()
+
+        if not torch.isfinite(loss):
+            logger.warning("Skipping optimizer step: non-finite loss")
+            self._optimizer.zero_grad()
+            return agent_lls, prior_lls, augmented_lls, loss
 
         self._optimizer.zero_grad()
         loss.backward()

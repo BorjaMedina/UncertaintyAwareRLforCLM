@@ -148,6 +148,9 @@ def compute_transform(
         smilies, scoring_function, cache, valid_mask, index_smiles
     )
 
+    uncertainty_type = getattr(scoring_function, "uncertainty_type", None)
+    component_results.uncertainty_type = uncertainty_type
+
     transformed_scores = []
     # this loop is over multiple scores per component
     ## check if any index_smiles are not keys in the component_results.data object:

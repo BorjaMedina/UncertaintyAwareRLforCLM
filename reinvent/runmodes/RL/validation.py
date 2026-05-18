@@ -21,6 +21,7 @@ class SectionParameters(GlobalConfig):
     unique_sequences: bool = False
     temperature: float = 1.0
     tb_isim: Optional[bool] = False  # Add iSIM tracking as optional parameter
+    average: bool = False  # Add average parameter
 
 
 class SectionLearningStrategy(GlobalConfig):
