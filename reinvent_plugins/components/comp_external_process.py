@@ -115,13 +115,12 @@ class ExternalProcess:
         env = os.environ.copy()
         env['CUDA_VISIBLE_DEVICES'] = env.get('CUDA_VISIBLE_DEVICES', '0')
         
-        #np.savetxt("/home/kcgd777/temp_input.txt", smilies, fmt="%s")
+
         result = run_command([_executable] + _args+[input_path])
         data = json.loads(result.stdout)
         logger.debug(result)
         logger.debug(data)
-        #with open("/home/kcgd777/temp_results.json", mode="r") as json_file:
-            #data = json.load(json_file)
+
         if "payload" not in data:
             raise ValueError(
                 f"{__name__}: Stdout from {self.executable} does not contain 'payload': {result.stdout}"
