@@ -12,10 +12,7 @@
 
 
 nvidia-smi
-module load Miniconda3/4.12.0
 
-source /home/$USER/miniconda3/etc/profile.d/conda.sh
-conda deactivate
 conda activate reinvent4
 config=$1
 
