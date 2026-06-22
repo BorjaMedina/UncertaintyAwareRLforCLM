@@ -39,3 +39,4 @@ class RLReportData:
     start_time: float
     n_steps: int
     mask_idx: np.ndarray
+    score_std: Optional[np.ndarray] = None

@@ -140,9 +140,19 @@ class Learning(ABC):
                 self.sampled.states == SmilesState.DUPLICATE, False, True
             )
             results=[]
+            std_scores = None
             if self.average:
-                all_results = [self.score() for _ in range(200)]
-                mean_scores = np.mean([r.total_scores for r in all_results], axis=0)
+                self.scoring_function.use_cache = False
+                all_results = [self.score() for _ in range(10)]
+                self.scoring_function.use_cache = True
+                all_total_scores = np.array([r.total_scores for r in all_results])
+                mean_scores = np.mean(all_total_scores, axis=0)
+                std_scores = np.std(all_total_scores, axis=0)
+                logger.debug(
+                    f"Averaging {len(all_results)} oracle calls: "
+                    f"mean total score={mean_scores.mean():.4f}, "
+                    f"mean std={std_scores.mean():.4f}"
+                )
                 results = all_results[0]
                 results.total_scores = mean_scores
             else:
@@ -187,6 +197,7 @@ class Learning(ABC):
                 prior_lls=prior_lls,
                 augmented_nll=augmented_nll,
                 loss=float(loss),
+                score_std=std_scores,
             )
 
             if converged(mean_scores, step):
@@ -298,6 +309,7 @@ class Learning(ABC):
         prior_lls: torch.tensor,
         augmented_nll: torch.tensor,
         loss: float,
+        score_std: Optional[np.ndarray] = None,
     ):
         """Log the results"""
 
@@ -365,6 +377,7 @@ class Learning(ABC):
             start_time=self.start_time,
             n_steps=self.max_steps,
             mask_idx=mask_idx,
+            score_std=score_std,
         )
 
         for reporter in self.reporters:

@@ -28,15 +28,13 @@ class ReinventLearning(Learning):
         for component in results.completed_components:
             if component.component_result.uncertainty_type and component.component_result.uncertainty_type.startswith("reward"):
                 component_distances=component.transformed_scores[0]/(np.mean(component.transformed_scores[0])+eps)
-                logger.debug("component.component_result.uncertainty_type: %s", component.component_result.uncertainty_type)
                 all_distances.append(component_distances)
 
         if all_distances:
             distances = np.mean(all_distances, axis=0)
-
+        
         agent_nlls = self._state.agent.likelihood_smiles(self.sampled.items2)
         prior_nlls = self.prior.likelihood_smiles(self.sampled.items2)
-
         return self.reward_nlls(
             orig_smilies,
             results.total_scores,

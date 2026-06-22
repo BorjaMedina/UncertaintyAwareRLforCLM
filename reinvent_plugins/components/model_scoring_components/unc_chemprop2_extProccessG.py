@@ -16,16 +16,6 @@ from chemprop.uncertainty import MVEEstimator
 
 from rdkit import Chem
 
-def sigmoidTrans(x, steepness=3, center=0.5, min_val=0, max_val=6):
-    x = np.array(x)
-    x_clipped = np.clip(x, min_val, max_val)
-
-    result = 1 / (1 + np.exp(-steepness * (x_clipped - center)))
-    sigmoid_min = 1 / (1 + np.exp(-steepness * (min_val - center)))
-    sigmoid_max = 1 / (1 + np.exp(-steepness * (max_val - center)))
-    result = (result - sigmoid_min) / (sigmoid_max - sigmoid_min)
-    return result
-
 model_path = sys.argv[1]
 input_path=sys.argv[2]
 

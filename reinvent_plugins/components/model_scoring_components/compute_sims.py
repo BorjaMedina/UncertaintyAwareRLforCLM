@@ -1,10 +1,8 @@
 from typing import List
 import numpy as np
-from rdkit import Chem
-from rdkit import Chem
-from rdkit.Chem import AllChem
-from rdkit import DataStructs
-from rdkit.Chem import Descriptors
+from rdkit import Chem, DataStructs
+from rdkit.Chem import AllChem, Descriptors
+
 from sklearn.impute import SimpleImputer
 
 from reinvent.chemistry.similarity import calculate_tanimoto_batch, calculate_cosine_batch

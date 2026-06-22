@@ -37,8 +37,6 @@ class Parameters:
 class NoisyLogP:
     """Compute noise in LogP and measure uncertainty of the noisy samples using different measures"""
 
-    no_cache = True  # stochastic component: disable caching so average=True works correctly
-
     def __init__(self, params: Parameters):
         logger = logging.getLogger("reinvent")
 
@@ -121,7 +119,12 @@ class NoisyLogP:
 
     def updateDist(self,smiles: List[str]):     
         initSmi=smiles
-        length = compute_sims.compute_SimEuclideanPCA(self,initSmi,init=True)
+        if "tanimoto" in self.uncertainty_type:
+            sims = compute_sims.compute_SimTan(self,smiles, normalize=False, mean=False)
+            length=1-np.array(sims)
+
+        elif "euclideanPCA" in self.uncertainty_type:
+            length = compute_sims.compute_SimEuclideanPCA(self,initSmi,init=True)
         self.meanSim=np.mean(length)
 
         

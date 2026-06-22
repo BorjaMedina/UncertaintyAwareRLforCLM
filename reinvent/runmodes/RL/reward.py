@@ -242,7 +242,7 @@ class RLReward:
 
             loss = torch.cat((loss, inception_loss), 0)
 
-        # weights only covers the original batch; pad with ones for inception samples - this probably needs to be rethought and fixed
+            # weights only covers the original batch; pad with ones for inception samples - this probably needs to be rethought and fixed
             n_inception = len(loss) - len(weights)
             weights = torch.cat((weights, torch.ones(n_inception, dtype=weights.dtype, device=weights.device)), 0)
 

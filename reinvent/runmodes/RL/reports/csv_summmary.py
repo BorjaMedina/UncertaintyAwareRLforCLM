@@ -87,6 +87,10 @@ def write_summary(data, write_header):
         [str(state.value) for state in data.sampled.states],
     ]
 
+    if data.score_std is not None:
+        header.append("Score_std")
+        columns.append([f"{s:.7f}" for s in data.score_std])
+
     if data.model_type in MODEL_SPECIFIC_HEADERS.keys():
         header.extend(MODEL_SPECIFIC_HEADERS[data.model_type])
 

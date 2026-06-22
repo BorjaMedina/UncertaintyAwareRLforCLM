@@ -139,67 +139,160 @@ def compute_transform(
     :param cache: the component's cache
     :param valid_mask: mask for valid SMILES, i.e. false for invalid
     :param index_smiles: list of SMILES to index scores, used when the scored SMILES are fragments
+    :param use_pumas: whether to use PUMAS transforms (element-wise float64) or reinvent transforms (array-wise)
     :returns: dataclass with transformed results
     """
 
     names, scoring_function, transforms, weights = params
 
-    component_results = compute_component_scores(
-        smilies, scoring_function, cache, valid_mask, index_smiles
-    )
-
     uncertainty_type = getattr(scoring_function, "uncertainty_type", None)
-    component_results.uncertainty_type = uncertainty_type
+    if uncertainty_type is None:
+        uncertainty_type = ""
 
-    transformed_scores = []
-    # this loop is over multiple scores per component
-    ## check if any index_smiles are not keys in the component_results.data object:
-    if index_smiles is not None:
-        missing_scores = [smiles for smiles in index_smiles if smiles not in component_results.data]
-    else:
-        missing_scores = [smiles for smiles in smilies if smiles not in component_results.data]
-
-    if missing_scores:
-        logger.debug(f"{cache=}")
-        logger.debug(f"{component_results.data.keys()=}")
-        raise RuntimeError(f"Missing scores for {component_type} for {missing_scores}")
-
-    for scores, transform in zip(
-        component_results.fetch_scores(
-            smiles=index_smiles if index_smiles is not None else smilies, transpose=True
-        ),
-        transforms,
-    ):
-
-        # NOTE: The valid SMILES here are the molecules which are both valid
-        #       AND not duplicates i.e. duplicate (and invalid) SMILES in the
-        #       BATCH are scored as zero.  This is the same behaviour as in
-        #       REINVENT3 and earlier.  The duplicate handling is independent
-        #       of the diversity filter (DF) which scores ALL duplicates as
-        #       zero i.e. the DF acts globally.
-        if use_pumas:
-            # PUMAS Transforms operate on float64 so the transformed result may be slightly different to reinvent base scoring.
-            if transform:
-                transformed = [transform(score) for score in scores]
-            else:
-                transformed = scores
-            transformed_scores.append(transformed * valid_mask)
-        else:
-            transformed = transform(scores) if transform else scores
-            transformed_scores.append(transformed * valid_mask)
+    check_smiles = index_smiles if index_smiles is not None else smilies
 
     if use_pumas:
-        transform_types= [transform.name if transform else None for transform in transforms]
+        transform_types = [transform.name if transform else None for transform in transforms]
     else:
         transform_types = [transform.params.type if transform else None for transform in transforms]
 
-    transform_result = TransformResults(
-        component_type,
-        names,
-        transform_types,
-        transformed_scores,
-        component_results,
-        weights,
-    )
+    if "gaussianSample" in uncertainty_type:
+        # Run the deterministic component ONCE to get mu (predictions) and sigma² (uncertainties).
+        # Then sample 200 times from N(mu, sigma) in numpy — no model overhead — and average
+        # the post-transform scores.  The component must expose two endpoints in this order:
+        #   endpoint 0: "predictions"   (mu)   — has the desired transform (e.g. sigmoid)
+        #   endpoint 1: "uncertainties" (sigma²) — typically weight=0, no transform
+        logger.debug(f"Computing gaussianSample for component {component_type}")
+
+        component_results = compute_component_scores(
+            smilies, scoring_function, cache, valid_mask, index_smiles
+        )
+        component_results.uncertainty_type = uncertainty_type
+
+        missing_scores = [s for s in check_smiles if s not in component_results.data]
+        if missing_scores:
+            raise RuntimeError(f"Missing scores for {component_type} for {missing_scores}")
+
+        all_scores = list(
+            component_results.fetch_scores(smiles=check_smiles, transpose=True)
+        )
+
+        mu = np.array(all_scores[0], dtype=float)
+        sigma2 = np.array(all_scores[1], dtype=float) if len(all_scores) > 1 else np.zeros_like(mu)
+        sigma = np.sqrt(np.abs(sigma2))
+
+        prediction_transform = transforms[0]
+        n_samples = 200
+        sampled_transformed = []
+        for _ in range(n_samples):
+            sample = np.random.normal(mu, sigma)
+            if use_pumas:
+                t = np.array([prediction_transform(s) for s in sample]) if prediction_transform else sample
+            else:
+                t = prediction_transform(sample) if prediction_transform else sample
+            sampled_transformed.append(t * valid_mask)
+
+        mean_transformed = np.mean(sampled_transformed, axis=0)
+        std_transformed = np.std(sampled_transformed, axis=0)
+
+        # Store std in per-SMILES metadata so it appears in the CSV automatically
+        for i, smi in enumerate(check_smiles):
+            if smi in component_results.data:
+                current_meta = component_results.data[smi].metadata or {}
+                component_results.data[smi].metadata = {**current_meta, "score_std": float(std_transformed[i])}
+
+        # First endpoint = averaged sampled score; remaining endpoints passed through as-is
+        transformed_scores = [mean_transformed]
+        for raw_scores, transform in zip(all_scores[1:], transforms[1:]):
+            raw = np.array(raw_scores, dtype=float)
+            if use_pumas:
+                t = np.array([transform(s) for s in raw]) if transform else raw
+            else:
+                t = transform(raw) if transform else raw
+            transformed_scores.append(t * valid_mask)
+
+        transform_result = TransformResults(
+            component_type,
+            names,
+            transform_types,
+            transformed_scores,
+            component_results,
+            weights,
+        )
+
+    elif "meanPostMPO" in uncertainty_type:
+        logger.debug(f"Computing meanPostMPO for component {component_type}")
+        all_transformed = []
+        for _ in range(200):
+            component_results = compute_component_scores(
+                smilies, scoring_function, cache, valid_mask, index_smiles
+            )
+
+            missing_scores = [s for s in check_smiles if s not in component_results.data]
+            if missing_scores:
+                raise RuntimeError(f"Missing scores for {component_type} for {missing_scores}")
+
+            transformed_scores = []
+            for scores, transform in zip(
+                component_results.fetch_scores(smiles=check_smiles, transpose=True),
+                transforms,
+            ):
+                if use_pumas:
+                    transformed = [transform(score) for score in scores] if transform else scores
+                else:
+                    transformed = transform(scores) if transform else scores
+                transformed_scores.append(transformed * valid_mask)
+
+            all_transformed.append(transformed_scores)
+
+        component_results.uncertainty_type = uncertainty_type
+
+        transform_result = TransformResults(
+            component_type,
+            names,
+            transform_types,
+            np.array(np.mean(all_transformed, axis=0)),
+            component_results,
+            weights,
+        )
+
+    else:
+        component_results = compute_component_scores(
+            smilies, scoring_function, cache, valid_mask, index_smiles
+        )
+        component_results.uncertainty_type = uncertainty_type
+
+        missing_scores = [s for s in check_smiles if s not in component_results.data]
+        if missing_scores:
+            logger.debug(f"{cache=}")
+            logger.debug(f"{component_results.data.keys()=}")
+            raise RuntimeError(f"Missing scores for {component_type} for {missing_scores}")
+
+        transformed_scores = []
+        for scores, transform in zip(
+            component_results.fetch_scores(smiles=check_smiles, transpose=True),
+            transforms,
+        ):
+            # NOTE: The valid SMILES here are the molecules which are both valid
+            #       AND not duplicates i.e. duplicate (and invalid) SMILES in the
+            #       BATCH are scored as zero.  This is the same behaviour as in
+            #       REINVENT3 and earlier.  The duplicate handling is independent
+            #       of the diversity filter (DF) which scores ALL duplicates as
+            #       zero i.e. the DF acts globally.
+            if use_pumas:
+                # PUMAS Transforms operate on float64 so the transformed result may be slightly different to reinvent base scoring.
+                transformed = [transform(score) for score in scores] if transform else scores
+            else:
+                transformed = transform(scores) if transform else scores
+            transformed_scores.append(transformed * valid_mask)
+
+        transform_result = TransformResults(
+            component_type,
+            names,
+            transform_types,
+            transformed_scores,
+            component_results,
+            weights,
+        )
 
     return transform_result

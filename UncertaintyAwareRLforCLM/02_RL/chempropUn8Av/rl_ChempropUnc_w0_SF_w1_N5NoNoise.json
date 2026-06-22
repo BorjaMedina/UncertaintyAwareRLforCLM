@@ -1,11 +1,11 @@
 {
     "run_type": "staged_learning",
     "use_cuda": true,
-    "tb_logdir": "./chemprop/ChempropUnc_w0_SF_w1_N5_Reward",
+    "tb_logdir": "./chempropUn8Av/ChempropUnc_w0_SF_w1_N5_NoNoise",
     "json_out_config": "_staged_learning.json",
     "parameters": {
         "use_checkpoint": false,
-        "summary_csv_prefix": "./chemprop/ChempropUnc_w0_SF_w1_N5_Reward",
+        "summary_csv_prefix": "./chempropUn8Av/ChempropUnc_w0_SF_w1_N5_NoNoise",
         "prior_file": "../../priors/reinvent.prior",
         "agent_file": "../../priors/reinvent.prior",
         "batch_size": 64,
@@ -27,7 +27,7 @@
     },
     "stage": [
         {
-            "chkpt_file": "./chemprop/ChempropUnc_w0_SF_w1_N5_Reward",
+            "chkpt_file": "./chempropUn8Av/ChempropUnc_w0_SF_w1_N5_NoNoise",
             "termination": "simple",
             "max_score": 0.9,
             "min_steps": 10000,
@@ -40,11 +40,18 @@
                         "endpoint": [
                             {
                             "name": "OracleEvaluator",
-                            "weight": 0,
+                            "weight": 1,
+                            "transform": {
+                                "type": "sigmoid",
+                                "high": 9.0,
+                                "low": 3,
+                                "k":0.18
+                            },
                             "params": {
                                 "executable": "/home/$USER$/miniconda3/condabin/conda",
-                                "args": "run -n chemprop python ../../reinvent_plugins/components/model_scoring_components/chemprop2_extProccessG.py ../01_chemprop/chemprop_model_mve_egfr_full",
-                                "property": "predictions"
+                                "args": "run -n chemprop python ../../reinvent_plugins/components/model_scoring_components/chemprop2_extProccessG.py ../01_chemprop/chemprop_model_mve_egfr_fullUn8",
+                                "property": "predictions",
+                                "uncertainty_type": "gaussianSample"
                             }
                             }
                         ]
@@ -55,7 +62,7 @@
                         "endpoint": [
                             {
                             "name": "Chemprop",
-                            "weight": 1,
+                            "weight": 0,
                             "transform": {
                                 "type": "sigmoid",
                                 "high": 9.0,
@@ -64,8 +71,9 @@
                             },
                             "params": {
                                 "executable": "/home/$USER$/miniconda3/condabin/conda",
-                                "args": "run -n chemprop python ../../reinvent_plugins/components/model_scoring_components/chemprop2_extProccessG.py ../01_chemprop/chemprop_model_mve_egfr_supersmall",
-                                "property": "predictions"
+                                "args": "run -n chemprop python ../../reinvent_plugins/components/model_scoring_components/chemprop2_extProccessG.py ../01_chemprop/chemprop_model_mve_egfr_fullUn8",
+                                "property": "predictions",
+                                "uncertainty_type": "gaussianSample"
                             }
                             }
                         ]
@@ -79,9 +87,8 @@
                             "weight": 0,
                             "params": {
                                 "executable": "/home/$USER$/miniconda3/condabin/conda",
-                                "args": "run -n chemprop python ../../reinvent_plugins/components/model_scoring_components/unc_chemprop2_extProccessG.py ../01_chemprop/chemprop_model_mve_egfr_supersmall",
-                                "property": "predictions",
-                                "uncertainty_type": "reward_MVE"
+                                "args": "run -n chemprop python ../../reinvent_plugins/components/model_scoring_components/unc_chemprop2_extProccessG.py ../01_chemprop/chemprop_model_mve_egfr_fullUn8",
+                                "property": "predictions"
                             }
                             }
                         ]
@@ -94,9 +101,9 @@
                               "name": "DistanceEGFR",
                               "weight": 0,
                               "params": {
-                                "training_smiles": "../00_data/egfr/egfr_supersmall_smiles.csv",
+                                "training_smiles": "../00_data/egfr/cleaned_egfr_supersmall_smiles.csv",
                                 "uncertainty_type": "tanimoto",
-                                "neighbours": 5
+                                "neighbours": 3
                               }
                             }
                           ]

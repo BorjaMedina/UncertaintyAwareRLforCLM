@@ -41,6 +41,7 @@ class Parameters:
     args: List[str]
     property: List[str]
     uncertainty_type: List[str] = None
+    n_gaussian_samples: List[int] = None
 
 @add_tag("__component")
 class ExternalProcess:
@@ -77,6 +78,7 @@ class ExternalProcess:
         self.executable = params.executable[0]
         self.args = params.args[0]
         self.uncertainty_type= params.uncertainty_type[0] if params.uncertainty_type else None
+        self.n_gaussian_samples = params.n_gaussian_samples[0] if params.n_gaussian_samples else 200
 
         # Ensure only one executable is used for all endpoints
         for exe, arg in zip(params.executable, params.args):
