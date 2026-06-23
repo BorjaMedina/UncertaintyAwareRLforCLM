@@ -1,6 +1,6 @@
 # Uncertainty-Aware reinforcement learning for chemical language models
 
-This repository contains the code and experiments for my master's thesis on uncertainty-aware reinforcement learning for de novo molecular design.
+This repository contains the code and experiments for the article on uncertainty-aware reinforcement learning for de novo molecular design.
 Everything corresponding to the paper is inside of `UncertaintyAwareRLforCLM`
 
 ![RL Schematic](UncertaintyAwareRLforCLM/03_results/rlSchematic.png)
@@ -14,20 +14,19 @@ DISCLAIMER: If you want to check the `README.md` of REINVENT4 check `REINVENT4_R
 
 REINVENT4 is an open-source framework for molecular generation and multi-objective optimization. It uses a generative model (policy) to propose molecules and optimizes it with reinforcement learning based on scoring functions.
 
-In this thesis, REINVENT4 is the baseline framework and has been extended with new uncertainty-aware functionalities. These additions are implemented on top of the REINVENT4 workflow while preserving its core training and optimization process.
+In this article, REINVENT4 is the baseline framework and has been extended with new uncertainty-aware functionalities. These additions are implemented on top of the REINVENT4 workflow while preserving its core training and optimization process.
 
-This work relies on the original REINVENT4 implementation and the contributions of its authors and maintainers. Please cite the official REINVENT4 publication and repository when using or referencing this project.
+This work relies on the original REINVENT4 implementation and the contributions of its authors and maintainers. Please cite also the official REINVENT4 publication and repository when using or referencing this project.
 
 
 ## Repository Structure
 
 - `00_data/`: dataset preparation and cleaning.
-- `01_AD/`: applicability domain analysis.
 - `01_cp/`: conformal prediction and random forest uncertainty modeling.
 - `01_chemprop/`: Chemprop MVE training scripts.
 - `02_RL/`: REINVENT4 reinforcement learning experiments and configs.
 - `03_results/`: generated figures and summary plots.
-- `presentationPlots.ipynb`: notebook used for thesis/presentation plots.
+- `figures.ipynb`: notebook used for article plots.
 
 ## Environment Setup
 
@@ -90,7 +89,7 @@ Inside this notebook we create the conformal prediction model
 
 This folder contains all required configuration files, organized by experiment type, including Model System experiments, Chemprop experiments (point-estimation and averaged variants), and conformal prediction experiments.
 
-For the Model System, configurations are provided for both the Unique Noisy Function and Multiple Noisy Functions settings, as well as the low-similarity and mid-similarity scenarios used in the master's thesis.
+For the Model System, configurations are provided for both the Unique Noisy Function and Multiple Noisy Functions settings, as well as the low-similarity and mid-similarity scenarios used in the article.
 
 Main launcher scripts:
 
@@ -123,11 +122,11 @@ Main output locations:
 
 - RL logs: `02_RL/00_reinventLogs/`
 - RL experiment folders: `02_RL/finalRL/`
-- figures used in the thesis: `03_results/`
+- figures used in the article: `03_results/`
 
 For final figure generation and presentation plots, use:
 
-- `presentationPlots.ipynb`
+- `figures.ipynb`
 
 ## Quick Reproduction Checklist
 
@@ -136,11 +135,11 @@ For final figure generation and presentation plots, use:
 3. Train Chemprop and/or conformal uncertainty models.
 4. Select RL JSON configs in `02_RL/finalRL/.../csv/`.
 5. Launch RL with `sbatch 02_RL/runRL.sh <config.json>`.
-6. Aggregate and visualize results from `03_results/` and `presentationPlots.ipynb`.
+6. Aggregate and visualize results from `03_results/` and `figures.ipynb`.
 
-## Thesis Context
+## Paper Context
 
-The thesis studies how predictive uncertainty can be integrated into molecular RL in two ways:
+The article studies how predictive uncertainty can be integrated into molecular RL in two ways:
 
 1. As an explicit optimization objective in the scoring function.
 2. As a modulation signal for policy updates.
@@ -151,13 +150,13 @@ Experiments include synthetic and real-world uncertainty settings (AD-like scena
 ## REINVENT4
 ### 1) Main changes in REINVENT4
 
-In this project, I implemented new uncertainty-aware scoring components in REINVENT4.
+We implemented new uncertainty-aware scoring components in REINVENT4.
 
 Main plugin folder:
 
 `reinvent_plugins/components/model_scoring_components`
 
-All scripts in this folder are thesis-specific additions used to incorporate uncertainty into scoring.
+All scripts in this folder are additions used to incorporate uncertainty into scoring.
 
 #### 1.1 Core uncertainty components
 
@@ -200,8 +199,15 @@ These components load a pre-trained conformal model artifact (`cloudpickle`) and
 
 #### 1.6 Notes
 
-- The components above were used in the uncertainty experiments described in this thesis (model system, Chemprop, and conformal settings).
+- The components above were used in the uncertainty experiments described in the article (model system, Chemprop, and conformal settings).
 - Additional modifications were also made in other REINVENT4 files outside this folder to make the uncertainty work.
+
+## Citation
+
+This work is currently submitted as a preprint on arXiv. If you use this code or build on this work, please cite:
+
+
+Please also cite the original REINVENT4 paper.
 
 
 
