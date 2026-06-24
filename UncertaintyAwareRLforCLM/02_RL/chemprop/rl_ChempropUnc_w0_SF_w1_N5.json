@@ -93,7 +93,7 @@
                               "name": "DistanceEGFR",
                               "weight": 0,
                               "params": {
-                                "training_smiles": "../00_data/egfr/egfr_supersmall_smiles.csv",
+                                "training_smiles": "../00_data/egfr/cleaned_egfr_supersmall_smiles.csv",
                                 "uncertainty_type": "tanimoto",
                                 "neighbours": 5
                               }
