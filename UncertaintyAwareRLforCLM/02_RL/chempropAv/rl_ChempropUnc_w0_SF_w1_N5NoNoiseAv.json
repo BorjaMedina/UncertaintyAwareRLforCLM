@@ -53,6 +53,16 @@
                                 "property": "predictions",
                                 "uncertainty_type": "gaussianSample"
                             }
+                            },
+                            {
+                                "name": "OracleEvaluator_sigma2",
+                                "weight": 0,
+                                "params": {
+                                    "executable": "/home/$USER$/miniconda3/condabin/conda",
+                                    "args": "run -n chemprop python ../../reinvent_plugins/components/model_scoring_components/chemprop2_extProccessG.py ../01_chemprop/chemprop_model_mve_egfr_full",
+                                    "property": "uncertainties",
+                                    "uncertainty_type": "gaussianSample"
+                                }
                             }
                         ]
                         }
