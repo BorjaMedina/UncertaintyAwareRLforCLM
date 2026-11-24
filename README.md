@@ -30,17 +30,52 @@ This work relies on the original REINVENT4 implementation and the contributions 
 
 ## Environment Setup
 
-Create and activate the main conda environment:
+Use **two separate environments** for the Chemprop experiments:
 
+- `reinvent4`: runs REINVENT and its scoring components. The package declares a legacy Chemprop 1.x dependency; keep that dependency in this environment.
+- `chemprop`: runs Chemprop 2.2.1 training and the external MVE prediction scripts with Python 3.11.
+
+Do not install Chemprop 2 into the REINVENT environment. The Chemprop experiment configs use `ExternalProcess` to launch a separate Python process, so the two Chemprop versions do not need to coexist in one interpreter. Model-system experiments do not need the external Chemprop 2 environment.
+
+Run the following installation commands from the **repository root** (the directory containing this README and `pyproject.toml`):
 
 ```bash
-conda env create -f chemprop.yaml
-```
-```bash
-conda env create -f reinvent4.yaml
+conda create -n chemprop python=3.11 pip
+conda run -n chemprop python -m pip install "chemprop==2.2.1"
+
+conda create -n reinvent4 python=3.10 pip
 conda activate reinvent4
+python -m pip install -e .
 ```
 
+The editable install uses this repository's modified REINVENT implementation. See [REINVENT4 installation instructions](REINVENT4_README.md) for hardware requirements and optional dependencies. Install notebook and analysis dependencies separately as needed. These commands provide a minimal setup rather than a fully pinned reproduction environment.
+
+### Existing Environment Exports
+
+The supplied YAML files are located at `UncertaintyAwareRLforCLM/00_data/chemprop.yaml` and `UncertaintyAwareRLforCLM/00_data/reinvent4.yaml`, not in the repository root. For example, to use the original Chemprop export instead of the minimal setup above:
+
+```bash
+conda env create -f UncertaintyAwareRLforCLM/00_data/chemprop.yaml
+```
+
+These files record the original environments and include platform-specific packages and build versions. They may require adjustments for your system and package sources. For a new installation, prefer the minimal setup above. OpenEye is optional and requires its own package source and license when used.
+
+### Connect REINVENT to Chemprop 2
+
+In **each** Chemprop `ExternalProcess` endpoint, replace the original `/home/$USER$/...` executable and machine-specific paths. Either call the Chemprop environment's Python directly:
+
+```json
+{
+    "executable": "/absolute/path/to/envs/chemprop/bin/python",
+    "args": "/absolute/path/to/repo/reinvent_plugins/components/model_scoring_components/chemprop2_extProccessG.py /absolute/path/to/model_directory",
+    "property": "predictions",
+    "uncertainty_type": "gaussianSample"
+}
+```
+
+Or set `executable` to the absolute path of your conda executable and prefix `args` with `run --no-capture-output -n chemprop python `. Keep the endpoint's original script, property and uncertainty settings: uncertainty endpoints use `unc_chemprop2_extProccessG.py`. Quote individual paths within `args` if they contain spaces.
+
+REINVENT appends a temporary SMILES-file path to these arguments and reads JSON predictions/uncertainties from stdout. The model directory must contain the trained checkpoints and `*calibrator.pkl` expected by the wrapper. Activate `reinvent4` to run RL; there is no need to activate `chemprop` in the same shell. Other paths in the RL config must also match your installation and working directory.
 
 ## How to Reproduce the Workflow
 
@@ -56,9 +91,7 @@ The datasets were downloaded form ChEMBL Version 34.
 
 This step produces curated datasets under `00_data/egfr/` and `00_data/drd2/` used by downstream models.
 
-Additionlly we also create the conda environemnts needed.
-
-DISCLAIMER: to run reinvent you will need to install reinvent inside the reinvent4 conda env following the instructions present in `REINVENT4_README.md`
+Create the environments using the instructions above before running the notebook. Its environment-creation commands are commented out and do not install anything as supplied.
 
 ### 2) Train Uncertainty Models
 
@@ -130,7 +163,7 @@ For final figure generation and presentation plots, use:
 
 ## Quick Reproduction Checklist
 
-1. Create conda environment from `reinvent4.yaml`.
+1. Install this repository in `reinvent4`; for Chemprop experiments, also create the separate Chemprop 2 environment and update every external scorer's executable/script/model paths as described above.
 2. Prepare/clean datasets in `00_data/cleaningData.ipynb`.
 3. Train Chemprop and/or conformal uncertainty models.
 4. Select RL JSON configs in `02_RL/finalRL/.../csv/`.
