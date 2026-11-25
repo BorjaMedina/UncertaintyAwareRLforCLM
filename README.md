@@ -1,7 +1,7 @@
 # Uncertainty-Aware reinforcement learning for chemical language models
 
 This repository contains the code and experiments for the article on uncertainty-aware reinforcement learning for de novo molecular design.
-Everything corresponding to the paper is inside of `UncertaintyAwareRLforCLM`
+All paper-specific code, data and configs live inside the `UncertaintyAwareRLforCLM/` subdirectory (`00_data/`, `01_chemprop/`, `02_RL/`, …). Unless stated otherwise, every path in the "How to Reproduce" section below is relative to that subdirectory, **not** the repository root. The only commands run from the repository root are the package installs (`pip install -e .`) and downloading the prior (see below).
 
 ![RL Schematic](UncertaintyAwareRLforCLM/03_results/rlSchematic.png)
 
@@ -30,17 +30,75 @@ This work relies on the original REINVENT4 implementation and the contributions 
 
 ## Environment Setup
 
-Create and activate the main conda environment:
+Use **two separate environments** for the Chemprop experiments:
 
+- `reinvent4`: runs REINVENT and its scoring components. The package declares a legacy Chemprop 1.x dependency; keep that dependency in this environment.
+- `chemprop`: runs Chemprop 2.2.1 training and the external MVE prediction scripts with Python 3.11.
+
+Do not install Chemprop 2 into the REINVENT environment. The Chemprop experiment configs use `ExternalProcess` to launch a separate Python process, so the two Chemprop versions do not need to coexist in one interpreter. Model-system experiments do not need the external Chemprop 2 environment.
+
+Run the following installation commands from the **repository root** (the directory containing this README and `pyproject.toml`):
 
 ```bash
-conda env create -f chemprop.yaml
-```
-```bash
-conda env create -f reinvent4.yaml
+conda create -n chemprop python=3.11 pip
+conda run -n chemprop python -m pip install "chemprop==2.2.1"
+
+# IMPORTANT: pin torch < 2.6 for the chemprop env.
+# An unpinned install resolves to torch >= 2.6, which breaks Chemprop 2.2.1 two ways:
+#  (1) torch.load now defaults to weights_only=True, so reloading the trained
+#      checkpoint fails with "UnpicklingError: Weights only load failed ... AttributeDict";
+#  (2) the bundled CUDA runtime is often newer than the installed GPU driver.
+# The CPU wheel below is sufficient for the smoke test; for GPU use the matching
+# CUDA build of torch 2.5.1 for your driver instead of the CPU index.
+conda run -n chemprop python -m pip install "torch==2.5.1" \
+    --index-url https://download.pytorch.org/whl/cpu
+
+conda create -n reinvent4 python=3.10 pip
 conda activate reinvent4
+python -m pip install -e .
 ```
 
+The editable install uses this repository's modified REINVENT implementation. See [REINVENT4 installation instructions](REINVENT4_README.md) for hardware requirements and optional dependencies. Install notebook and analysis dependencies separately as needed. These commands provide a minimal setup rather than a fully pinned reproduction environment.
+
+### Existing Environment Exports
+
+The supplied YAML files are located at `UncertaintyAwareRLforCLM/00_data/chemprop.yaml` and `UncertaintyAwareRLforCLM/00_data/reinvent4.yaml`, not in the repository root. For example, to use the original Chemprop export instead of the minimal setup above:
+
+```bash
+conda env create -f UncertaintyAwareRLforCLM/00_data/chemprop.yaml
+```
+
+These files record the original environments and include platform-specific packages and build versions. They may require adjustments for your system and package sources. For a new installation, prefer the minimal setup above. OpenEye is optional and requires its own package source and license when used.
+
+### Download the generative prior
+
+Every RL config references a pretrained REINVENT prior at `priors/reinvent.prior` (relative to the repository root). The prior is **not** stored in this repository because of its size. Download it from Zenodo and save it under a `priors/` directory at the repository root:
+
+```bash
+mkdir -p priors
+curl -L -o priors/reinvent.prior \
+    https://zenodo.org/records/20701824/files/reinvent_pubchem.prior
+```
+
+The RL configs expect the filename `reinvent.prior`, so keep the `-o priors/reinvent.prior` target above (the Zenodo file is named `reinvent_pubchem.prior`). If you place it elsewhere, update `prior_file`/`agent_file` in the configs accordingly.
+
+### Connect REINVENT to Chemprop 2
+
+In **each** Chemprop `ExternalProcess` endpoint, replace the original `/home/$USER$/...` executable and machine-specific paths. Either call the Chemprop environment's Python directly:
+
+```json
+{
+    "executable": "/absolute/path/to/envs/chemprop/bin/python",
+    "args": "/absolute/path/to/repo/reinvent_plugins/components/model_scoring_components/chemprop2_extProccessG.py /absolute/path/to/model_directory",
+    "property": "predictions"
+}
+```
+
+This matches the `params` block shipped in the configs (`executable`, `args`, `property`). Prediction endpoints call `chemprop2_extProccessG.py`; uncertainty endpoints call `unc_chemprop2_extProccessG.py` on the same model directory — keep whichever script the original endpoint used.
+
+Alternatively, set `executable` to the absolute path of your conda executable and prefix `args` with `run --no-capture-output -n chemprop python `. Quote individual paths within `args` if they contain spaces.
+
+REINVENT appends a temporary SMILES-file path to these arguments and reads JSON predictions/uncertainties from stdout. The model directory must contain the trained checkpoints and `*calibrator.pkl` expected by the wrapper. Activate `reinvent4` to run RL; there is no need to activate `chemprop` in the same shell. Other paths in the RL config must also match your installation and working directory.
 
 ## How to Reproduce the Workflow
 
@@ -52,26 +110,43 @@ Start from:
 
 - `00_data/cleaningData.ipynb`
 
-The datasets were downloaded form ChEMBL Version 34.
+The datasets were downloaded from ChEMBL version 34 and are shipped gzip-compressed (`00_data/egfr/egfr.csv.gz`, `00_data/drd2/drd2.csv.gz`). The notebook decompresses them in its first code cell; if you run the cleaning steps outside the notebook, decompress first and keep the archive:
 
-This step produces curated datasets under `00_data/egfr/` and `00_data/drd2/` used by downstream models.
+```bash
+gunzip -k 00_data/egfr/egfr.csv.gz
+gunzip -k 00_data/drd2/drd2.csv.gz
+```
 
-Additionlly we also create the conda environemnts needed.
+This step produces curated datasets under `00_data/egfr/` and `00_data/drd2/` used by downstream models. For the Chemprop EGFR experiments the key outputs are `cleaned_egfr.csv`, `cleaned_egfr_supersmall.csv`, and `cleaned_egfr_supersmall_smiles.csv` (the last is required by the `UNCdistances` scoring component).
 
-DISCLAIMER: to run reinvent you will need to install reinvent inside the reinvent4 conda env following the instructions present in `REINVENT4_README.md`
+Create the environments using the instructions above before running the notebook. Its environment-creation commands are commented out and do not install anything as supplied.
+
+**Notebook caveats:** run the cells you need rather than the whole notebook top-to-bottom — the EGFR and DRD2 branches are independent, and a couple of intermediate `to_csv` calls (e.g. `cleaned_egfr_small.csv`) are commented out while later cells read those files. Run only the cells for the dataset you are reproducing.
 
 ### 2) Train Uncertainty Models
 
 #### 2.1 Chemprop MVE models
 
-GPU cluster (SLURM) examples:
+GPU cluster (SLURM) examples — submit from inside `01_chemprop/` (the scripts use paths relative to that directory and write `--save-dir ./chemprop_model_*`):
 
 ```bash
-sbatch 01_chemprop/runChempropSuperSmall.sh
-sbatch 01_chemprop/runChempropFull.sh
+cd 01_chemprop
+sbatch runChempropSuperSmall.sh   # small/fast model, good for a smoke test
+sbatch runChempropFull.sh         # full model used in the paper
 ```
 
-These scripts train MVE Chemprop regressors and save artifacts to the paths defined inside each script.
+These scripts train MVE Chemprop regressors and save artifacts to the paths defined inside each script. Notes:
+- The scripts call `conda activate chemprop`; in a non-interactive SLURM shell you must first `source <conda>/etc/profile.d/conda.sh` (or adjust the script) for `conda activate` to work. Edit the `#SBATCH` partition/account/gres lines to match your cluster.
+- CPU alternative (no GPU driver needed): run the same `chemprop train ...` command with `CUDA_VISIBLE_DEVICES=""`.
+
+**Build the uncertainty calibrator (required).** After training, create the `mve_calibrator.pkl` that the external scoring scripts load from the model directory:
+
+```bash
+cd 01_chemprop
+python createCalibrator.py ./chemprop_model_mve_egfr_supersmall   # or the full model dir
+```
+
+`createCalibrator.py` reads `../00_data/egfr/cleaned_egfr.csv` (validation split) and writes `mve_calibrator.pkl` into the model directory. The RL scoring component will fail to load if this file is missing.
 
 #### 2.2 Conformal prediction (RF + split conformal)
 
@@ -87,41 +162,42 @@ Inside this notebook we create the conformal prediction model
 
 - `02_RL/`
 
-This folder contains all required configuration files, organized by experiment type, including Model System experiments, Chemprop experiments (point-estimation and averaged variants), and conformal prediction experiments.
+This folder contains all required configuration files, organized by experiment type. The config subfolders are:
 
-For the Model System, configurations are provided for both the Unique Noisy Function and Multiple Noisy Functions settings, as well as the low-similarity and mid-similarity scenarios used in the article.
+- `chemprop/`, `chempropAv/`, `chempropUn8/`, `chempropUn8Av/` — Chemprop experiments (point-estimate and averaged variants).
+- `conformal/` — conformal prediction experiments.
+- `multipleNoise_low/`, `multipleNoise_mid/`, `uniqueNoise_low/`, `uniqueNoise_mid/` — Model System experiments (Multiple vs Unique Noisy Functions, low- and mid-similarity scenarios).
 
-Main launcher scripts:
+**Run RL from inside `02_RL/`.** The config files use paths relative to that directory (`../../priors/reinvent.prior`, `../01_chemprop/...`, `../00_data/...`, `../../reinvent_plugins/...`), so they resolve only when `02_RL/` is the working directory. Make sure the prior has been downloaded (see *Download the generative prior*) and that the Chemprop model directories and calibrators exist.
 
-- `02_RL/runRL.sh` (GPU partition)
-- `02_RL/runRLcpu.sh` (CPU partition)
-- `02_RL/runMultiple.sh` (batch submit for a config folder)
+Main launcher scripts (in `02_RL/`):
 
-Submit one RL run:
+- `runRL.sh` (GPU partition) — the site-specific `#SBATCH --partition`/`--account` lines are commented placeholders; uncomment and set them (and adjust `--gres`) for your cluster. Create the log directory it writes to (`mkdir -p 02_RL/00_reinventLogs`) and ensure `conda activate` works in a batch shell (see the Chemprop training note).
+- `runRLcpu.sh` (CPU partition).
+- `runMultiple.sh` — batch-submit every `*.json` in a config folder: `bash runMultiple.sh <config_folder> [job_script]` (e.g. `bash runMultiple.sh chemprop runRL.sh`).
+
+Submit one RL run (from `02_RL/`):
 
 ```bash
-sbatch 02_RL/runRL.sh 02_RL/finalRL/multipleNoise_low/rl_doubleUnc_w0_SF_w1_N5.json
+cd 02_RL
+mkdir -p 00_reinventLogs
+sbatch runRL.sh chemprop/rl_ChempropUnc_w0_SF_w1_N5.json
 ```
 
-Submit multiple runs:
+Run locally without SLURM (from `02_RL/`):
 
 ```bash
-bash 02_RL/runMultiple.sh
-```
-
-Run locally without SLURM:
-
-```bash
+cd 02_RL
 conda activate reinvent4
-reinvent --log-level debug 02_RL/finalRL/multipleNoise_low/rl_doubleUnc_w0_SF_w1_N5.json
+reinvent --log-level debug chemprop/rl_ChempropUnc_w0_SF_w1_N5.json
 ```
 
 ### 4) Collect and Plot Results
 
 Main output locations:
 
-- RL logs: `02_RL/00_reinventLogs/`
-- RL experiment folders: `02_RL/finalRL/`
+- RL logs: `02_RL/00_reinventLogs/` (create it before the first run)
+- RL experiment outputs: written next to each config under its `02_RL/<experiment>/` subfolder (e.g. `02_RL/chemprop/`), following the `tb_logdir`/`summary_csv_prefix` in each config
 - figures used in the article: `03_results/`
 
 For final figure generation and presentation plots, use:
@@ -130,12 +206,13 @@ For final figure generation and presentation plots, use:
 
 ## Quick Reproduction Checklist
 
-1. Create conda environment from `reinvent4.yaml`.
-2. Prepare/clean datasets in `00_data/cleaningData.ipynb`.
-3. Train Chemprop and/or conformal uncertainty models.
-4. Select RL JSON configs in `02_RL/finalRL/.../csv/`.
-5. Launch RL with `sbatch 02_RL/runRL.sh <config.json>`.
-6. Aggregate and visualize results from `03_results/` and `figures.ipynb`.
+1. Install this repository in `reinvent4`; for Chemprop experiments, also create the separate Chemprop 2 environment (**pinning `torch<2.6`**) and update every external scorer's executable/script/model paths as described above.
+2. Download the generative prior to `priors/reinvent.prior` (see *Download the generative prior*).
+3. Prepare/clean datasets in `/UncertaintyAwareRLforCLM/00_data/cleaningData.ipynb` (decompress the `.gz` files first).
+4. Train Chemprop and/or conformal uncertainty models, then build the calibrator (`createCalibrator.py <model_dir>`).
+5. Select RL JSON configs from the subfolders of `/UncertaintyAwareRLforCLM/02_RL/` (e.g. `02_RL/chemprop/`, `02_RL/conformal/`, `02_RL/multipleNoise_low/`).
+6. Launch RL from inside `02_RL/`, e.g. `sbatch runRL.sh chemprop/rl_ChempropUnc_w0_SF_w1_N5.json`.
+7. Aggregate and visualize results from `03_results/` and `figures.ipynb`.
 
 ## Paper Context
 
@@ -204,7 +281,7 @@ These components load a pre-trained conformal model artifact (`cloudpickle`) and
 
 ## Citation
 
-This work is currently submitted as a preprint on arXiv. If you use this code or build on this work, please cite:
+This work is currently submitted as a preprint on arXiv. If you use this code or build on this work, please cite: https://arxiv.org/abs/2606.24990
 
 
 Please also cite the original REINVENT4 paper.

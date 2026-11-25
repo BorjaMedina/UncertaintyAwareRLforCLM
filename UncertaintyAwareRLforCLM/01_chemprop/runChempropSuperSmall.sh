@@ -1,17 +1,17 @@
 #!/bin/bash
-#SBATCH --job-name=reinvent_job
-#SBATCH --output=reinvent_%j.out
+#SBATCH --job-name=chemprop_train
+#SBATCH --output=chemprop_%j.out
 #SBATCH --time=5:00:00
-#SBATCH --partition=medium-gpu
-#SBATCH --gres=gpu:a100
 #SBATCH --mem=20GB
+#SBATCH --gres=gpu:1
+# --- Cluster-specific: uncomment and edit for your own Slurm site ---
+##SBATCH --partition=<your-gpu-partition>
+##SBATCH --account=<your-account>
 
-
-
-
-nvidia-smi
+# Make `conda activate` work in a non-interactive batch shell. Edit the path to
+# your conda installation, or replace the two conda lines with your own activation.
+# source /path/to/conda/etc/profile.d/conda.sh
 conda activate chemprop
-
 
 chemprop train \
     -i ../00_data/egfr/cleaned_egfr_supersmall.csv\
@@ -24,4 +24,3 @@ chemprop train \
     --epochs 200
 
 conda deactivate
-
