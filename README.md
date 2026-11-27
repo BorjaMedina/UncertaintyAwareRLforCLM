@@ -30,45 +30,51 @@ This work relies on the original REINVENT4 implementation and the contributions 
 
 ## Environment Setup
 
-Use **two separate environments** for the Chemprop experiments:
+The Chemprop experiments use **two separate conda environments**:
 
-- `reinvent4`: runs REINVENT and its scoring components. The package declares a legacy Chemprop 1.x dependency; keep that dependency in this environment.
-- `chemprop`: runs Chemprop 2.2.1 training and the external MVE prediction scripts with Python 3.11.
+- `reinvent4` (Python 3.10): runs REINVENT and its scoring components. REINVENT depends on legacy Chemprop 1.x; keep that dependency in this environment.
+- `chemprop` (Python 3.11): runs Chemprop 2.2.1 training and the external MVE prediction scripts. Not needed for the model-system experiments.
 
-Do not install Chemprop 2 into the REINVENT environment. The Chemprop experiment configs use `ExternalProcess` to launch a separate Python process, so the two Chemprop versions do not need to coexist in one interpreter. Model-system experiments do not need the external Chemprop 2 environment.
+The two are kept apart on purpose: the RL configs invoke Chemprop 2 in a separate process via `ExternalProcess`, so Chemprop 1.x and 2.x never have to share an interpreter. Do not install Chemprop 2 into the REINVENT environment.
 
-Run the following installation commands from the **repository root** (the directory containing this README and `pyproject.toml`):
+> **Tested on:** Rocky Linux 8.10 (x86_64), conda 24.11.3, NVIDIA A100 (driver 570.x, CUDA 12.8). Any recent Linux + conda should work; match the PyTorch build to your own GPU driver (see below).
+
+### Recommended: minimal install
+
+This path is portable and not tied to our exact build versions. Run from the **repository root** (the directory containing this README and `pyproject.toml`):
 
 ```bash
+# chemprop 2 environment
 conda create -n chemprop python=3.11 pip
 conda run -n chemprop python -m pip install "chemprop==2.2.1"
 
-# IMPORTANT: pin torch < 2.6 for the chemprop env.
-# An unpinned install resolves to torch >= 2.6, which breaks Chemprop 2.2.1 two ways:
-#  (1) torch.load now defaults to weights_only=True, so reloading the trained
-#      checkpoint fails with "UnpicklingError: Weights only load failed ... AttributeDict";
-#  (2) the bundled CUDA runtime is often newer than the installed GPU driver.
-# The CPU wheel below is sufficient for the smoke test; for GPU use the matching
-# CUDA build of torch 2.5.1 for your driver instead of the CPU index.
+# Pin PyTorch < 2.6. Chemprop 2.2.1 predates the PyTorch 2.6 change that makes
+# torch.load default to weights_only=True, which otherwise prevents reloading the
+# trained checkpoint. Install a torch 2.5.x build that matches your hardware:
+#   CPU-only (sufficient for the smoke test):
 conda run -n chemprop python -m pip install "torch==2.5.1" \
     --index-url https://download.pytorch.org/whl/cpu
+#   GPU: install the torch 2.5.x wheel for your CUDA driver instead (see pytorch.org).
 
+# REINVENT environment (this repo's modified REINVENT, installed editable)
 conda create -n reinvent4 python=3.10 pip
 conda activate reinvent4
 python -m pip install -e .
 ```
 
-The editable install uses this repository's modified REINVENT implementation. See [REINVENT4 installation instructions](REINVENT4_README.md) for hardware requirements and optional dependencies. Install notebook and analysis dependencies separately as needed. These commands provide a minimal setup rather than a fully pinned reproduction environment.
+See [REINVENT4 installation instructions](REINVENT4_README.md) for optional dependencies; install notebook/analysis extras as needed.
 
-### Existing Environment Exports
+### Fallback: exact environment exports
 
-The supplied YAML files are located at `UncertaintyAwareRLforCLM/00_data/chemprop.yaml` and `UncertaintyAwareRLforCLM/00_data/reinvent4.yaml`, not in the repository root. For example, to use the original Chemprop export instead of the minimal setup above:
+The repository also ships full conda exports of the environments we used, at `UncertaintyAwareRLforCLM/00_data/chemprop.yaml` and `UncertaintyAwareRLforCLM/00_data/reinvent4.yaml`. They pin exact build and version numbers from our system, so prefer the minimal install above for portability and reach for these only if you need our precise versions. Status on the tested system above:
 
-```bash
-conda env create -f UncertaintyAwareRLforCLM/00_data/chemprop.yaml
-```
+- **`chemprop.yaml` — works as-is.** Reproduces the Chemprop environment we used (torch 2.9.1 / lightning 2.5.6) and installs and trains cleanly on both CPU and A100 (its pinned lightning handles the checkpoint reload, so no torch pin is needed here):
+  ```bash
+  conda env create -n chemprop -f UncertaintyAwareRLforCLM/00_data/chemprop.yaml
+  ```
+- **`reinvent4.yaml` — reference only; does not install standalone.** It pins `reinvent==4.6.27`, which is *this repository* (install it with `python -m pip install -e .` as above — it is not published on PyPI), and the licensed `openeye-toolkits` (optional — needs an OpenEye license and package channel). Use the minimal REINVENT install above and consult this file only to match specific dependency versions.
 
-These files record the original environments and include platform-specific packages and build versions. They may require adjustments for your system and package sources. For a new installation, prefer the minimal setup above. OpenEye is optional and requires its own package source and license when used.
+OpenEye is optional throughout; install it only if you use OpenEye-based functionality.
 
 ### Download the generative prior
 
